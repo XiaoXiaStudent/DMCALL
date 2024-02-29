@@ -25,6 +25,36 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 
 	// 加载DLL
 	HMODULE hModule = LoadLibrary(TEXT("DmReg.dll"));
+
+	HMODULE hModule1 = LoadLibrary(TEXT("msdk.dll"));  // 使用正确的DLL文件名
+
+	if (hModule1 == NULL)
+	{
+		std::cerr << "加载dll失败!" << std::endl;
+		FreeLibrary(hModule1);
+		return 1;
+	}
+
+	typedef HANDLE(*M_OpenType)(int);
+
+	typedef void (*M_MoveToType)(HANDLE,int, int);
+
+
+
+	M_OpenType open = (M_OpenType)GetProcAddress(hModule, "M_Open");
+
+	M_MoveToType moveToMsdk = (M_MoveToType)GetProcAddress(hModule, "M_MoveTo");
+
+	//HANDLE handle = open(1);
+	 
+	moveToMsdk(NULL,200,300);
+
+	FreeLibrary(hModule1);
+ 
+
+ 
+
+	FreeLibrary(hModule1);
  
 	// 获取函数地址
 	SetDllPathWType SetDllPathW = (SetDllPathWType)GetProcAddress(hModule, "SetDllPathW"); //init
@@ -68,7 +98,7 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等等
 	dmsoft& dm = *g_dm;
 
-	dm.MoveTo(300, 500);
+	//dm.MoveTo(300, 500);
 
 	delete g_dm;
 
