@@ -26,8 +26,12 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="dm.dll" />
-    <None Include="DmReg.dll" />
+    <None Include="dm.dll">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="DmReg.dll">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="obj.h">
@@ -36,5 +40,16 @@
     <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="msdk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="msdkLib.lib">
+      <Filter>Resource Files</Filter>
+    </Library>
+    <Library Include="hid.lib">
+      <Filter>Resource Files</Filter>
+    </Library>
   </ItemGroup>
 </Project>

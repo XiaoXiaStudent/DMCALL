@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "obj.h"
+#include "msdk.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -26,41 +27,21 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	// 加载DLL
 	HMODULE hModule = LoadLibrary(TEXT("DmReg.dll"));
 
-	HMODULE hModule1 = LoadLibrary(TEXT("msdk.dll"));  // 使用正确的DLL文件名
+	HANDLE openFYL = M_Open(1);
 
-	if (hModule1 == NULL)
-	{
-		std::cerr << "加载dll失败!" << std::endl;
-		FreeLibrary(hModule1);
-		return 1;
-	}
+	M_MoveTo2(openFYL, 200, 300);
 
-	typedef HANDLE(*M_OpenType)(int);
+	M_Close(openFYL);
 
-	typedef void (*M_MoveToType)(HANDLE,int, int);
-
-
-
-	M_OpenType open = (M_OpenType)GetProcAddress(hModule, "M_Open");
-
-	M_MoveToType moveToMsdk = (M_MoveToType)GetProcAddress(hModule, "M_MoveTo");
-
-	//HANDLE handle = open(1);
-	 
-	moveToMsdk(NULL,200,300);
-
-	FreeLibrary(hModule1);
- 
 
  
 
-	FreeLibrary(hModule1);
- 
 	// 获取函数地址
 	SetDllPathWType SetDllPathW = (SetDllPathWType)GetProcAddress(hModule, "SetDllPathW"); //init
 
 	// 检查函数地址是否成功获取
 	if (!SetDllPathW) {
+
 		std::cerr << "获取函数地址失败!" << std::endl;
 		FreeLibrary(hModule);
 		return 1;
@@ -84,7 +65,7 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	{
 		std::cout << "注册失败:" << dm_ret << std::endl;
 		std::wcout << L"版本:" << version.GetString() << std::endl;
-	
+
 		delete g_dm;
 		return 1;
 	}
@@ -93,7 +74,6 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 		std::cout << "注册成功" << std::endl;
 		std::wcout << L"版本:" << version.GetString() << std::endl;
 	}
-
 
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等等
 	dmsoft& dm = *g_dm;
