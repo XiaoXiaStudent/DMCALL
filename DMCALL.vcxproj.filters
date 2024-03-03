@@ -52,9 +52,4 @@
       <Filter>Resource Files</Filter>
     </Library>
   </ItemGroup>
-  <ItemGroup>
-    <Image Include="deskphoto.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-  </ItemGroup>
 </Project>

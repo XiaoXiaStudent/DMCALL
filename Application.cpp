@@ -1,6 +1,6 @@
 // example.cpp : 定义控制台应用程序的入口点。
 //
-
+#include <Afxwin.h>  
 #include "stdafx.h"
 #include "obj.h"
 #include "msdk.h"
@@ -24,14 +24,19 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	// 注意：这里使用了 const wchar_t* 并且指定了 __stdcall 调用约定
 	typedef void(__stdcall* SetDllPathWType)(const wchar_t*, int);
 
-	// 加载DLL
+	// 使用MFC的AfxLoadLibrary加载DLL
 	HMODULE hModule = LoadLibrary(TEXT("DmReg.dll"));
+	if (hModule == NULL) {
+		std::cerr << "加载DLL失败!" << std::endl;
+		return 1;
+	}
 
-	//HANDLE openFYL = M_Open(1);
 
-	//M_MoveTo2(openFYL, 200, 300);
+	/*HANDLE openFYL = M_Open(1);
 
-	//M_Close(openFYL);
+	M_MoveTo2(openFYL, 200, 300);
+
+	M_Close(openFYL);*/
 
 
 	HANDLE openFYL = Ap5isNXMcaWr(1);
@@ -40,22 +45,22 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 
 	Dfd8mbZxDc0f(openFYL);
 
+ 
 	// 获取函数地址
-	SetDllPathWType SetDllPathW = (SetDllPathWType)GetProcAddress(hModule, "SetDllPathW"); //init
-
-	// 检查函数地址是否成功获取
+	SetDllPathWType SetDllPathW = (SetDllPathWType)GetProcAddress(hModule, "SetDllPathW");
 	if (!SetDllPathW) {
-
 		std::cerr << "获取函数地址失败!" << std::endl;
 		FreeLibrary(hModule);
 		return 1;
 	}
 
-	SetDllPathW(_T("dm.dll"), 0) ;
+	// 调用函数
+	SetDllPathW(_T("dm.dll"), 0);
+
 	FreeLibrary(hModule);
 
 	// 创建对象
-	g_dm = new dmsoft;
+	g_dm = new dmsoft();
 	if (g_dm == NULL)
 	{
 		return 1;
@@ -69,7 +74,7 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	{
 		std::cout << "注册失败:" << dm_ret << std::endl;
 		std::wcout << L"版本:" << version.GetString() << std::endl;
-
+		FreeLibrary(hModule);
 		delete g_dm;
 		return 1;
 	}
