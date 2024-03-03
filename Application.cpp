@@ -47,7 +47,7 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 		return 1;
 	}
 
-	SetDllPathW(_T("dm.dll"), 0);
+	SetDllPathW(_T("dm.dll"), 0) ;
 	FreeLibrary(hModule);
 
 	// 创建对象
@@ -78,7 +78,12 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等等
 	dmsoft& dm = *g_dm;
 
-	//dm.MoveTo(300, 500);
+
+	dm.Capture(0, 0, 2240, 1400, TEXT("deskphoto.bmp"));
+
+	//dm.FindColor(0, 0, 2240, 1400, TEXT("ffffff-000000"), 1.);
+
+	dm.MoveTo(300, 500);
 
 	delete g_dm;
 
