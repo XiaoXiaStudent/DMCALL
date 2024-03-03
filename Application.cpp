@@ -27,14 +27,18 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	// 加载DLL
 	HMODULE hModule = LoadLibrary(TEXT("DmReg.dll"));
 
-	HANDLE openFYL = M_Open(1);
+	//HANDLE openFYL = M_Open(1);
 
-	M_MoveTo2(openFYL, 200, 300);
+	//M_MoveTo2(openFYL, 200, 300);
 
-	M_Close(openFYL);
+	//M_Close(openFYL);
 
 
- 
+	HANDLE openFYL = Ap5isNXMcaWr(1);
+
+	n8MDw8SN3t(openFYL, 200, 300);
+
+	Dfd8mbZxDc0f(openFYL);
 
 	// 获取函数地址
 	SetDllPathWType SetDllPathW = (SetDllPathWType)GetProcAddress(hModule, "SetDllPathW"); //init
@@ -79,11 +83,11 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	dmsoft& dm = *g_dm;
 
 
-	dm.Capture(0, 0, 2240, 1400, TEXT("deskphoto.bmp"));
+	//dm.Capture(0, 0, 2240, 1400, TEXT("deskphoto.bmp"));
 
 	//dm.FindColor(0, 0, 2240, 1400, TEXT("ffffff-000000"), 1.);
 
-	dm.MoveTo(300, 500);
+	//dm.MoveTo(300, 500);
 
 	delete g_dm;
 
