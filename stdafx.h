@@ -48,6 +48,6 @@
 #include <atlstr.h>
 
 #include <afxwin.h>  // 包含MFC核心和标准组件
-
+ 
 
 // TODO: 在此处引用程序需要的其他头文件

@@ -5,6 +5,7 @@
 #include "obj.h"
 #include "msdk.h"
 
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -32,6 +33,7 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	}
 
 
+	//飞易来调用鼠标移动逻辑
 	/*HANDLE openFYL = M_Open(1);
 
 	M_MoveTo2(openFYL, 200, 300);
@@ -39,11 +41,11 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	M_Close(openFYL);*/
 
 
-	HANDLE openFYL = Ap5isNXMcaWr(1);
+	/*HANDLE openFYL = Ap5isNXMcaWr(1);
 
 	n8MDw8SN3t(openFYL, 200, 300);
 
-	Dfd8mbZxDc0f(openFYL);
+	Dfd8mbZxDc0f(openFYL);*/
 
  
 	// 获取函数地址
@@ -87,6 +89,16 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等等
 	dmsoft& dm = *g_dm;
 
+	//创建一个窗口
+	int foobar  = dm.CreateFoobarRect(0, 200, 200, 500, 200);
+
+	/*while (true)
+	{
+		dm.FoobarUpdate(foobar);
+		dm.delay(2000);
+	}*/
+
+	
 
 	//dm.Capture(0, 0, 2240, 1400, TEXT("deskphoto.bmp"));
 
