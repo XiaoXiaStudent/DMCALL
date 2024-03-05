@@ -166,6 +166,12 @@
     <Library Include="hid.lib" />
     <Library Include="msdkLib.lib" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="搜索公司.bmp" />
+    <Image Include="更多.bmp" />
+    <Image Include="核算组织页面.bmp" />
+    <Image Include="海信集团.bmp" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
