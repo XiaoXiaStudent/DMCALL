@@ -52,3 +52,4 @@
 #include <Windows.h> // 对于Sleep函数
 #include <ctime> // 对于计时
 #include "array"
+#include <vector>
