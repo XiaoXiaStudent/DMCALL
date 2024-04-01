@@ -84,44 +84,31 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等等
 	dmsoft& dm = *g_dm;
 
-	long  intX, intY;
 
-	CString result = g_dm->FindColorEx(0, 0, 2000, 2000, L"49A996-0B0D06", 0.8, 0);
+	// 图片路径，请替换为你的图片路径
+	std::string imagePath = "C:\\Users\\86159\\Pictures\\Screenshots\\微信图片_20240322141523.bmp";
 
-	// 检查返回值，确认是否找到了颜色块
+	// 使用cv::imread函数读取图片
+	cv::Mat image = cv::imread(imagePath, cv::IMREAD_COLOR);
 
-	// 构建要显示的消息字符串
-	CString message;
-
-	// 使用GetResultCount获取找到的颜色数量
-	long count = g_dm->GetResultCount(result);
-
-	for (long index = 0; index < count; ++index) {
-		long intX, intY;
-		// 对于每个找到的颜色，使用GetResultPos获取其坐标
-		g_dm->GetResultPos(result, index, &intX, &intY);
-
-		g_dm->MoveTo(intX, intY);
-
-
+	// 检查图片是否成功加载
+	if (image.empty()) {
+		std::cout << "无法加载图片" << std::endl;
+		return -1;
 	}
-	std::wstringstream ss;
-	for (long index = 0; index < count; ++index) {
-		ss << intX << L"," << intY << L" "; // 将坐标添加到stringstream
-	}
-	
 
-	//dm.Capture(0, 0, 2240, 1400, TEXT("deskphoto.bmp"));
+	// 创建一个窗口
+	cv::namedWindow("Display window", cv::WINDOW_AUTOSIZE);
 
-	//dm.FindColor(0, 0, 2240, 1400, TEXT("ffffff-000000"), 1.);
+	// 在窗口中显示图片
+	cv::imshow("Display window", image);
 
-	//dm.MoveTo(300, 500);
-
-	std::cin.get();
+	//等待关闭
+	cv::waitKey();
 
 	delete g_dm;
 
-	return nRetCode;
+	return 0;
 }
 
 

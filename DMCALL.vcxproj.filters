@@ -52,33 +52,4 @@
       <Filter>Resource Files</Filter>
     </Library>
   </ItemGroup>
-  <ItemGroup>
-    <Image Include="更多.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="核算组织页面.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="搜索公司.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="海信集团.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="选择公司.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="选择编码过滤.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="过滤内容框.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="重置.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="等于.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-  </ItemGroup>
 </Project>
