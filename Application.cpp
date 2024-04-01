@@ -84,7 +84,31 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等等
 	dmsoft& dm = *g_dm;
 
-	
+	long  intX, intY;
+
+	CString result = g_dm->FindColorEx(0, 0, 2000, 2000, L"49A996-0B0D06", 0.8, 0);
+
+	// 检查返回值，确认是否找到了颜色块
+
+	// 构建要显示的消息字符串
+	CString message;
+
+	// 使用GetResultCount获取找到的颜色数量
+	long count = g_dm->GetResultCount(result);
+
+	for (long index = 0; index < count; ++index) {
+		long intX, intY;
+		// 对于每个找到的颜色，使用GetResultPos获取其坐标
+		g_dm->GetResultPos(result, index, &intX, &intY);
+
+		g_dm->MoveTo(intX, intY);
+
+
+	}
+	std::wstringstream ss;
+	for (long index = 0; index < count; ++index) {
+		ss << intX << L"," << intY << L" "; // 将坐标添加到stringstream
+	}
 	
 
 	//dm.Capture(0, 0, 2240, 1400, TEXT("deskphoto.bmp"));
@@ -92,6 +116,8 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	//dm.FindColor(0, 0, 2240, 1400, TEXT("ffffff-000000"), 1.);
 
 	//dm.MoveTo(300, 500);
+
+	std::cin.get();
 
 	delete g_dm;
 
