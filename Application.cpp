@@ -5,10 +5,12 @@
 #include "obj.h"
 #include "msdk.h"
 
- 
- 
- 
 dmsoft* g_dm = NULL;
+
+void test02();
+
+void test03();
+void test04();
 
 int main(int argc, TCHAR* argv[], TCHAR* envp[])
 {
@@ -80,211 +82,104 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 		std::cout << "注册成功" << std::endl;
 		std::wcout << L"版本:" << version.GetString() << std::endl;
 	}
-
+ 
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等等
-	dmsoft& dm = *g_dm;
+
+ 
+
+	int x1 = 10, y1 = 10;
+	int x2 = 600, y2 = 600;
+	int width = x2 - x1 + 1;
+	int height = y2 - y1 + 1;
+
+	// 创建窗口以显示原始图像和轮廓图像
+	cv::namedWindow("Original Display", cv::WINDOW_AUTOSIZE);
+	cv::namedWindow("Contour Display", cv::WINDOW_AUTOSIZE);
+
+	while (true) {
+		long data;
+		long size;
+		int fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, &data, &size);
+
+		// 读取指针到数组
+		std::vector<unsigned char> genePic2(size);
+		for (int i = 0; i < size; i++) {
+			genePic2[i] = *reinterpret_cast<unsigned char*>(data + i);
+		}
+
+		// 从内存中的图像数据创建cv::Mat对象
+		cv::Mat image = cv::imdecode(cv::Mat(genePic2), cv::IMREAD_COLOR);
+
+		if (image.empty()) {
+			std::cout << "无法从内存数据加载图片" << std::endl;
+			break; // 退出循环
+		}
+
+		// 在原始窗口中显示图像
+		cv::imshow("Original Display", image);
+		std::vector<std::vector<cv::Point>> contours;
+		// 将图像转换为灰度图
+		cv::Mat grayImage;
+		cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
+
+		CString result = g_dm->FindMultiColorEx(x1, y1, x2, y2, L"D047C7-000000", L"29312B", 0.8, 0);
+
+		long count = g_dm->GetResultCount(result);
 
 
-	// 图片路径，请替换为你的图片路径
-	std::string imagePath = "C:\\Users\\86159\\Pictures\\Screenshots\\微信图片_20240322141523.bmp";
+		// 假设其他代码已经正确执行，count等变量已经被赋值
+		long intX, intY;
+		for (long index = 0; index < count; ++index) {
+			// 对于每个找到的颜色，使用GetResultPos获取其坐标
+			g_dm->GetResultPos(result, index, &intX, &intY);
 
-	// 使用cv::imread函数读取图片
-	cv::Mat image = cv::imread(imagePath, cv::IMREAD_COLOR);
+			// 将点添加到一个新的轮廓中
+			std::vector<cv::Point> newContour;
+			newContour.push_back(cv::Point(intX, intY)); // 将点加入到轮廓中
 
-	// 检查图片是否成功加载
-	if (image.empty()) {
-		std::cout << "无法加载图片" << std::endl;
-		return -1;
+			// 将新轮廓加入到contours中
+			contours.push_back(newContour);
+		}
+
+		// 使用Canny算法检测边缘
+		//cv::Mat edges;
+		//cv::Canny(grayImage, edges, 50, 150);
+
+		// 查找轮廓
+		//std::vector<std::vector<cv::Point>> contours;
+		//cv::findContours(edges, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+
+		// 绘制轮廓
+		cv::Mat contourImage = cv::Mat::zeros(image.size(), CV_8UC3);
+		for (size_t i = 0; i < contours.size(); i++) {
+			cv::Scalar color = cv::Scalar(255, 0, 0); // 轮廓颜色：蓝色
+			cv::drawContours(contourImage, contours, static_cast<int>(i), color, 2, cv::LINE_8);
+		}
+
+		// 在轮廓窗口中显示轮廓图像
+		cv::imshow("Contour Display", contourImage);
+
+		// 检查是否按下了ESC键
+		if (cv::waitKey(1) == 27) {
+			break; // 退出循环
+		}
 	}
-
-	// 创建一个窗口
-	cv::namedWindow("Display window", cv::WINDOW_AUTOSIZE);
-
-	// 在窗口中显示图片
-	cv::imshow("Display window", image);
-
-	//等待关闭
-	cv::waitKey();
+ 
 
 	delete g_dm;
+ 
 
 	return 0;
 }
 
 
 
-//void testCode() {
-//
-//	CString companies[] = { _T("1600") };
-//
-//	CString AddDaties[] = { _T("tea.0206.002"), _T("tea.0206.007") };
-//
-//
-//	//业务分类基础资料维护
-//		//查找更多按钮 点击
-//	long intX = 0, intY = 0; // 初始化坐标变量
-//	long findMoreButton = dm.FindPic(0, 0, 2240, 1400, L"更多.bmp", L"000000", 0.8, 2, &intX, &intY);
-//
-//	if (findMoreButton >= 0) {
-//		// 找到图片，处理坐标
-//		std::cout << "找到更多按钮，坐标为: (" << intX << ", " << intY << ")" << std::endl;
-//
-//		//点击更多按钮
-//		dm.MoveTo(intX, intY);
-//
-//		dm.LeftClick();
-//
-//		//等待页面加载完毕
-//
-//	// 计时开始
-//		clock_t start_time = clock();
-//
-//		// 超时时间设定为20秒
-//		const clock_t timeout = 40 * CLOCKS_PER_SEC; // CLOCKS_PER_SEC 是每秒钟的clock ticks
-//
-//		bool found = false; // 标记是否找到图片
-//
-//
-//
-//		while (true) {
-//			// 尝试找图
-//			long HisensePhoto = dm.FindPic(0, 0, 2240, 1400, L"海信集团.bmp", L"000000", 0.9, 2, &intX, &intY);
-//			std::cout << "加载出海信集团，坐标为: (" << intX << ", " << intY << ")" << std::endl;
-//			if (intX != -1 && intY != -1) {
-//				found = true; // 图片被找到
-//				break; // 跳出循环
-//			}
-//
-//			// 检查是否超时
-//			if (clock() - start_time > timeout) {
-//				break; // 如果超过20秒还没找到图片，则终止循环
-//			}
-//
-//			Sleep(1000); // 每次尝试之间等待1秒（1000毫秒），减少CPU使用率
-//		}
-//
-//		if (found) {
-//			// 找到图片，继续执行后续操作
-//
-//			long FindComany = dm.FindPic(0, 0, 2240, 1400, L"搜索公司.bmp", L"000000 ", 0.9, 2, &intX, &intY);
-//			std::cout << "找到海信搜索，坐标为: (" << intX << ", " << intY << ")" << std::endl;
-//			dm.MoveTo(intX + 50, intY);
-//
-//			dm.LeftClick();
-//
-//
-//
-//			//输入公司
-//			dm.KeyPressStr(companies[0], 20);
-//			wprintf(L"当前公司为: %s\n", companies[0].GetString());
-//			//按下回车
-//			dm.KeyDown(13);
-//
-//			Sleep(2000); // 等待两秒 加载出公司
-//
-//			//选择公司这里写死
-//			dm.MoveTo(764, 420);
-//
-//			dm.LeftClick();
-//			//如果找到该公司,选择 如果未找到  继续查找
-//
-//			//这里继续判断如果当前页面未关闭,重新搜索下一个公司,并赋值写导文本中那个公司中台没有
-//
-//
-//
-//
-//			Sleep(3000); // 等待两秒
-//
-//			//打开筛选内容,输入要维护的基础资料
-//			long selectNumberFilter = dm.FindPic(0, 0, 2240, 1400, L"选择编码过滤.bmp", L"000000 ", 0.5, 2, &intX, &intY);
-//			std::cout << "找到筛选内容按钮，坐标为: (" << intX << ", " << intY << ")" << std::endl;
-//			std::vector<int> numberPosition = { intX, intY };
-//
-//			if (selectNumberFilter > -1)
-//			{
-//				dm.MoveTo(intX + 35, intY + 5);
-//				Sleep(2000); // 等待两秒 
-//				dm.LeftClick();
-//
-//				Sleep(2000); // 等待两秒 
-//
-//				//先点击重置  然后重新打开过滤 输入内容
-//				long retrunBunton = dm.FindPic(0, 0, 2240, 1400, L"重置.bmp", L"000000 ", 0.7, 2, &intX, &intY);
-//				dm.MoveTo(intX + 20, intY + 10);
-//				Sleep(1000); // 等待两秒 
-//				dm.LeftClick();
-//
-//				Sleep(2000); // 等待两秒 
-//
-//				dm.MoveTo(numberPosition[0] + 35, numberPosition[1] + 5);
-//				Sleep(2000); // 等待两秒 
-//				dm.LeftClick();
-//
-//				Sleep(1000); // 等待两秒 
-//				long equalText = dm.FindPic(0, 0, 2240, 1400, L"等于.bmp", L"000000 ", 0.8, 2, &intX, &intY);
-//				std::cout << "找到等于，坐标为: (" << intX << ", " << intY << ")" << std::endl;
-//
-//				if (equalText >= 0)
-//				{
-//					dm.MoveTo(intX, intY);
-//					Sleep(1000); // 等待两秒 
-//					dm.LeftClick();
-//
-//					long FilterContext = dm.FindPic(0, 0, 2240, 1400, L"过滤内容框.bmp", L"000000 ", 0.8, 2, &intX, &intY);
-//					std::cout << "找到过滤内容框，坐标为: (" << intX << ", " << intY << ")" << std::endl;
-//					dm.MoveTo(intX + 20, intY + 10);
-//					Sleep(1000); // 等待两秒 
-//					dm.LeftClick();
-//
-//					//输入公司
-//					dm.KeyPressStr(AddDaties[0], 20);
-//					wprintf(L"当前过滤编码为: %s\n", AddDaties[0].GetString());
-//					//按下回车
-//					dm.KeyDown(13);
-//				}
-//
-//			}
-//
-//
-//
-//		}
-//		else {
-//			// 超时未找到图片，可能需要终止程序或进行错误处理
-//			// ...
-//		}
-//
-//	}
-//	else {
-//		// 未找到图片
-//		std::cout << "未找到更多按钮。" << std::endl;
-//	}
-//
-//
-//
-//	//查找输入框 点击
-//
-//	//输入记账公司编码,点击回车
-//
-//	//如果不存在公司编码 则跳过执行  	//选择输入编码的公司
-//
-//	//创建一个窗口
-//	//int foobar  = dm.CreateFoobarRect(0, 200, 200, 500, 200);
-//
-//	/*while (true)
-//	{
-//		dm.FoobarUpdate(foobar);
-//		dm.delay(2000);
-//	}*/
-//
-//	//获取指定窗口
-//
-//	//执行判断 按键一系列操作
-//
-//	//int x1, y1, x2, y2; // 定义变量以接收坐标值
-//
-//	//// 调用函数
-//	//CString str =  dm.EnumWindowByProcessId(14400, L"Chrome Legacy Window", L"Chrome_RenderWidgetHostHWND", 1+2);
-//	//
-// //
-//	//std::wcout << L"Window Handles: " << (LPCTSTR)str << std::endl;
-//}
+
+
+void test02() {
+
+	
+}
+
+//E525E2-060505
+//fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, &data, &size);
