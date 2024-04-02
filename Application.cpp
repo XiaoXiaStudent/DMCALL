@@ -83,9 +83,7 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 		std::wcout << L"版本:" << version.GetString() << std::endl;
 	}
  
-	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等等
-
- 
+	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等
 
 	int x1 = 10, y1 = 10;
 	int x2 = 600, y2 = 600;
@@ -97,9 +95,11 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	cv::namedWindow("Contour Display", cv::WINDOW_AUTOSIZE);
 
 	while (true) {
-		long data;
+		long data ;
 		long size;
+		std::cout << "调用 g_dm->GetScreenDataBmp 前" << std::endl;
 		int fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, &data, &size);
+		std::cout << "调用 g_dm->GetScreenDataBmp 后" << std::endl;
 
 		// 读取指针到数组
 		std::vector<unsigned char> genePic2(size);
@@ -107,9 +107,10 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 			genePic2[i] = *reinterpret_cast<unsigned char*>(data + i);
 		}
 
-		// 从内存中的图像数据创建cv::Mat对象
+		std::cout << "调用 cv::imdecode 前" << std::endl;
 		cv::Mat image = cv::imdecode(cv::Mat(genePic2), cv::IMREAD_COLOR);
-
+		std::cout << "调用 cv::imdecode 后" << std::endl;
+ 
 		if (image.empty()) {
 			std::cout << "无法从内存数据加载图片" << std::endl;
 			break; // 退出循环
@@ -122,47 +123,68 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 		cv::Mat grayImage;
 		cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
 
-		CString result = g_dm->FindMultiColorEx(x1, y1, x2, y2, L"D047C7-000000", L"29312B", 0.8, 0);
 
-		long count = g_dm->GetResultCount(result);
+		auto start = std::chrono::high_resolution_clock::now();
 
-
-		// 假设其他代码已经正确执行，count等变量已经被赋值
-		long intX, intY;
-		for (long index = 0; index < count; ++index) {
-			// 对于每个找到的颜色，使用GetResultPos获取其坐标
-			g_dm->GetResultPos(result, index, &intX, &intY);
-
-			// 将点添加到一个新的轮廓中
-			std::vector<cv::Point> newContour;
-			newContour.push_back(cv::Point(intX, intY)); // 将点加入到轮廓中
-
-			// 将新轮廓加入到contours中
-			contours.push_back(newContour);
-		}
-
-		// 使用Canny算法检测边缘
-		//cv::Mat edges;
-		//cv::Canny(grayImage, edges, 50, 150);
+		// 应用Canny边缘检测
+		cv::Mat edges;
+		cv::Canny(grayImage, edges, 1000, 200); // 这里的阈值50和150可以根据你的需求调整
 
 		// 查找轮廓
-		//std::vector<std::vector<cv::Point>> contours;
-		//cv::findContours(edges, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+		std::cout << "调用 cv::findContours 前" << std::endl;
+		cv::findContours(edges, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+		std::cout << "调用 cv::findContours 后" << std::endl;
+
+
+		//CString result = g_dm->FindMultiColorEx(x1, y1, x2, y2, L"D047C7-000000", L"29312B", 0.8, 0);
+
+		//long count = g_dm->GetResultCount(result);
+
+		//// 假设其他代码已经正确执行，count等变量已经被赋值
+		//long intX, intY;
+		//for (long index = 0; index < count; ++index) {
+		//	// 对于每个找到的颜色，使用GetResultPos获取其坐标
+		//	g_dm->GetResultPos(result, index, &intX, &intY);
+
+		//	// 将点添加到一个新的轮廓中
+		//	std::vector<cv::Point> newContour;
+		//	newContour.push_back(cv::Point(intX, intY)); // 将点加入到轮廓中
+
+		//	// 将新轮廓加入到contours中
+		//	contours.push_back(newContour);
+		//}
+		auto end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double, std::milli> elapsed = end - start;
+		std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";
+ 
 
 		// 绘制轮廓
 		cv::Mat contourImage = cv::Mat::zeros(image.size(), CV_8UC3);
 		for (size_t i = 0; i < contours.size(); i++) {
 			cv::Scalar color = cv::Scalar(255, 0, 0); // 轮廓颜色：蓝色
-			cv::drawContours(contourImage, contours, static_cast<int>(i), color, 2, cv::LINE_8);
+			cv::drawContours(contourImage, contours, static_cast<int>(i), color, 1, cv::LINE_8);
 		}
 
 		// 在轮廓窗口中显示轮廓图像
-		cv::imshow("Contour Display", contourImage);
+		std::cout << "调用 cv::imshow 前" << std::endl;
+		cv::imshow("Original Display", image);
+		std::cout << "调用 cv::imshow 后" << std::endl;
 
-		// 检查是否按下了ESC键
+
+		std::cout << "调用 cv::waitKey 前" << std::endl;
 		if (cv::waitKey(1) == 27) {
 			break; // 退出循环
 		}
+		std::cout << "调用 cv::waitKey 后" << std::endl;
+
+
+		std::cout << "调用 image.release() 前" << std::endl;
+		image.release();
+		std::cout << "调用 image.release() 后" << std::endl;
+
+		std::cout << "调用 contours.clear() 前" << std::endl;
+		contours.clear();
+		std::cout << "调用 contours.clear() 后" << std::endl;
 	}
  
 
