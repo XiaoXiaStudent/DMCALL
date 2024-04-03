@@ -1,19 +1,20 @@
 // example.cpp : 定义控制台应用程序的入口点。
 //
+
 #include <Afxwin.h>
 #include "stdafx.h"
 #include "obj.h"
 #include "msdk.h"
+#include "Application.h"
 
 dmsoft* g_dm = NULL;
 
-void test02();
-
-void test03();
-void test04();
-
 int main(int argc, TCHAR* argv[], TCHAR* envp[])
 {
+#ifdef _DEBUG
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+
 	int nRetCode = 0;
 
 	// 初始化COM(mta)
@@ -82,10 +83,19 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 		std::cout << "注册成功" << std::endl;
 		std::wcout << L"版本:" << version.GetString() << std::endl;
 	}
- 
-	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等
 
-	int x1 = 10, y1 = 10;
+	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等
+	captureToBuffer();
+
+
+	CoUninitialize();
+	delete g_dm;
+	return 0;
+}
+
+void captureToBuffer()
+{
+	int x1 = 0, y1 = 0;
 	int x2 = 600, y2 = 600;
 	int width = x2 - x1 + 1;
 	int height = y2 - y1 + 1;
@@ -94,46 +104,90 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	cv::namedWindow("Original Display", cv::WINDOW_AUTOSIZE);
 	cv::namedWindow("Contour Display", cv::WINDOW_AUTOSIZE);
 
-	while (true) {
-		long data ;
+	// 在循环外部准备可能重用的资源
+	cv::Mat hsvImage, mask, edges;
+
+	TCHAR rgb_color[] = _T("D047C7");
+	TCHAR rgb_color_offset[] = _T("29312B");
+
+	CString	bgr_color = g_dm->RGB2BGR(rgb_color);
+	CString	bgr_colo_offset = g_dm->RGB2BGR(rgb_color_offset);
+
+	std::vector<unsigned char> genePic2;
+	cv::Mat image;
+
+	int B = 199, G = 71, R = 208;
+	int deltaB = 43, deltaG = 49, deltaR = 41;
+
+	// 定义BGR空间中的颜色范围
+	cv::Scalar bgrLowerBound(B - deltaB, G - deltaG, R - deltaR);
+	cv::Scalar bgrUpperBound(B + deltaB, G + deltaG, R + deltaR);
+
+	while (true)
+
+	{
+
+		auto start = std::chrono::high_resolution_clock::now();
+
+		long data;
 		long size;
-		std::cout << "调用 g_dm->GetScreenDataBmp 前" << std::endl;
 		int fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, &data, &size);
-		std::cout << "调用 g_dm->GetScreenDataBmp 后" << std::endl;
 
 		// 读取指针到数组
-		std::vector<unsigned char> genePic2(size);
+		genePic2.clear();
+		genePic2.resize(size);
 		for (int i = 0; i < size; i++) {
 			genePic2[i] = *reinterpret_cast<unsigned char*>(data + i);
 		}
 
-		std::cout << "调用 cv::imdecode 前" << std::endl;
-		cv::Mat image = cv::imdecode(cv::Mat(genePic2), cv::IMREAD_COLOR);
-		std::cout << "调用 cv::imdecode 后" << std::endl;
- 
+		image = cv::imdecode(cv::Mat(genePic2), cv::IMREAD_COLOR);
+
 		if (image.empty()) {
 			std::cout << "无法从内存数据加载图片" << std::endl;
-			break; // 退出循环
+			//break; // 退出循环
 		}
 
 		// 在原始窗口中显示图像
 		cv::imshow("Original Display", image);
+
+		// HSV转换和掩码创建仅在需要时执行
+		cv::Mat  mask, edges;
+
+		//cv::inRange(hsvImage, cv::Scalar(140, 100, 100), cv::Scalar(160, 255, 255), mask);
+		cv::inRange(image, bgrLowerBound, bgrUpperBound, mask);
+		cv::Canny(mask, edges, 50, 150);
+
 		std::vector<std::vector<cv::Point>> contours;
-		// 将图像转换为灰度图
-		cv::Mat grayImage;
-		cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
-
-
-		auto start = std::chrono::high_resolution_clock::now();
-
-		// 应用Canny边缘检测
-		cv::Mat edges;
-		cv::Canny(grayImage, edges, 1000, 200); // 这里的阈值50和150可以根据你的需求调整
-
-		// 查找轮廓
-		std::cout << "调用 cv::findContours 前" << std::endl;
 		cv::findContours(edges, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
-		std::cout << "调用 cv::findContours 后" << std::endl;
+
+
+		// 绘制轮廓
+		cv::Mat contourImage = cv::Mat::zeros(image.size(), CV_8UC3);
+		for (size_t i = 0; i < contours.size(); i++) {
+			cv::Scalar color = cv::Scalar(255, 0, 0); // 轮廓颜色：蓝色
+			cv::drawContours(contourImage, contours, static_cast<int>(i), color, 1, cv::LINE_8);
+		}
+
+		// 在轮廓窗口中显示轮廓图像
+
+		cv::imshow("Contour Display", contourImage);
+
+		contours.clear();
+
+		auto end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double, std::milli> elapsed = end - start;
+		std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";
+
+		if (cv::waitKey(1) == 27) { // 当按下ESC键时退出循环
+			break;
+		}
+	}
+
+	
+}
+
+//E525E2-060505
+//fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, &data, &size);
 
 
 		//CString result = g_dm->FindMultiColorEx(x1, y1, x2, y2, L"D047C7-000000", L"29312B", 0.8, 0);
@@ -153,55 +207,3 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 		//	// 将新轮廓加入到contours中
 		//	contours.push_back(newContour);
 		//}
-		auto end = std::chrono::high_resolution_clock::now();
-		std::chrono::duration<double, std::milli> elapsed = end - start;
-		std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";
- 
-
-		// 绘制轮廓
-		cv::Mat contourImage = cv::Mat::zeros(image.size(), CV_8UC3);
-		for (size_t i = 0; i < contours.size(); i++) {
-			cv::Scalar color = cv::Scalar(255, 0, 0); // 轮廓颜色：蓝色
-			cv::drawContours(contourImage, contours, static_cast<int>(i), color, 1, cv::LINE_8);
-		}
-
-		// 在轮廓窗口中显示轮廓图像
-		std::cout << "调用 cv::imshow 前" << std::endl;
-		cv::imshow("Original Display", image);
-		std::cout << "调用 cv::imshow 后" << std::endl;
-
-
-		std::cout << "调用 cv::waitKey 前" << std::endl;
-		if (cv::waitKey(1) == 27) {
-			break; // 退出循环
-		}
-		std::cout << "调用 cv::waitKey 后" << std::endl;
-
-
-		std::cout << "调用 image.release() 前" << std::endl;
-		image.release();
-		std::cout << "调用 image.release() 后" << std::endl;
-
-		std::cout << "调用 contours.clear() 前" << std::endl;
-		contours.clear();
-		std::cout << "调用 contours.clear() 后" << std::endl;
-	}
- 
-
-	delete g_dm;
- 
-
-	return 0;
-}
-
-
-
-
-
-void test02() {
-
-	
-}
-
-//E525E2-060505
-//fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, &data, &size);

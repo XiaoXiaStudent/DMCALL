@@ -57,3 +57,5 @@
 #include <opencv2/opencv.hpp>
 #include <chrono>
 #include <opencv2/core/utils/logger.hpp>
+#define _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
