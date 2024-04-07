@@ -87,7 +87,6 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等
 	captureToBuffer();
 
-
 	CoUninitialize();
 	delete g_dm;
 	return 0;
@@ -99,34 +98,35 @@ void captureToBuffer()
 	int x2 = 600, y2 = 600;
 	int width = x2 - x1 + 1;
 	int height = y2 - y1 + 1;
+	long mouseX, mouseY;
 
 	// 创建窗口以显示原始图像和轮廓图像
 	cv::namedWindow("Original Display", cv::WINDOW_AUTOSIZE);
 	cv::namedWindow("Contour Display", cv::WINDOW_AUTOSIZE);
+	cv::namedWindow("Binary Contour Display", cv::WINDOW_AUTOSIZE);
+
+ 
 
 	// 在循环外部准备可能重用的资源
 	cv::Mat hsvImage, mask, edges;
-
-	TCHAR rgb_color[] = _T("D047C7");
-	TCHAR rgb_color_offset[] = _T("29312B");
-
-	CString	bgr_color = g_dm->RGB2BGR(rgb_color);
-	CString	bgr_colo_offset = g_dm->RGB2BGR(rgb_color_offset);
-
 	std::vector<unsigned char> genePic2;
 	cv::Mat image;
 
 	int B = 199, G = 71, R = 208;
-	int deltaB = 43, deltaG = 49, deltaR = 41;
+	int deltaB = 35, deltaG = 35, deltaR = 35;
 
 	// 定义BGR空间中的颜色范围
 	cv::Scalar bgrLowerBound(B - deltaB, G - deltaG, R - deltaR);
 	cv::Scalar bgrUpperBound(B + deltaB, G + deltaG, R + deltaR);
 
+		// 定义RGB颜色空间中的颜色范围（洋红色）
+  // 洋红色的HSV颜色空间范围
+	cv::Scalar hsvLowerBound(139, 96, 129);
+	cv::Scalar hsvUpperBound(169, 225, 225);
+
 	while (true)
 
 	{
-
 		auto start = std::chrono::high_resolution_clock::now();
 
 		long data;
@@ -150,45 +150,102 @@ void captureToBuffer()
 		// 在原始窗口中显示图像
 		cv::imshow("Original Display", image);
 
-		// HSV转换和掩码创建仅在需要时执行
-		cv::Mat  mask, edges;
+		//获取当前鼠标位置
+		g_dm->GetCursorPos(&mouseX, &mouseY);
 
-		//cv::inRange(hsvImage, cv::Scalar(140, 100, 100), cv::Scalar(160, 255, 255), mask);
-		cv::inRange(image, bgrLowerBound, bgrUpperBound, mask);
-		cv::Canny(mask, edges, 50, 150);
+		// 转换BGR图像到HSV颜色空间
+		cv::cvtColor(image, hsvImage, cv::COLOR_BGR2HSV);
 
+		// 使用HSV颜色范围在原始图像上创建掩码
+		cv::inRange(hsvImage, hsvLowerBound, hsvUpperBound, mask);
+
+
+		// 对掩码进行高斯模糊，减少噪声
+		cv::GaussianBlur(mask, mask, cv::Size(5, 5), 0);
+	
+		cv::Canny(mask, edges, 100, 200);
+
+	
+		// 创建一个5x5的结构元素
+		cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
+
+		// 对边缘图像进行闭运算
+		cv::morphologyEx(edges, edges, cv::MORPH_CLOSE, kernel);
+
+		// 显示二值化轮廓图像
+		cv::imshow("Binary Contour Display", edges);
+
+		// 在边缘图像上查找轮廓
 		std::vector<std::vector<cv::Point>> contours;
-		cv::findContours(edges, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+		cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
 
-		// 绘制轮廓
-		cv::Mat contourImage = cv::Mat::zeros(image.size(), CV_8UC3);
+		// 找到面积最大的轮廓的凸包
+		double maxArea = 0;
+		std::vector<cv::Point> largestHull;
 		for (size_t i = 0; i < contours.size(); i++) {
-			cv::Scalar color = cv::Scalar(255, 0, 0); // 轮廓颜色：蓝色
-			cv::drawContours(contourImage, contours, static_cast<int>(i), color, 1, cv::LINE_8);
+			// 对轮廓进行简化
+			std::vector<cv::Point> approx;
+			cv::approxPolyDP(contours[i], approx, 1.0, true);
+
+			// 计算凸包
+			std::vector<cv::Point> hull;
+			cv::convexHull(approx, hull);
+
+			// 检查是否为最大面积的凸包
+			double area = cv::contourArea(hull);
+			if (area > maxArea) {
+				maxArea = area;
+				largestHull = hull;
+			}
 		}
 
-		// 在轮廓窗口中显示轮廓图像
-
+		// 绘制最大凸包轮廓
+		cv::Mat contourImage = cv::Mat::zeros(image.size(), CV_8UC3);
+		if (!largestHull.empty()) {
+			std::vector<std::vector<cv::Point>> hullsToDraw;
+			hullsToDraw.push_back(largestHull);
+			cv::drawContours(contourImage, hullsToDraw, -1, cv::Scalar(255, 255, 255), 1);
+		}
+	 
+ 
+		// 显示轮廓图像
 		cv::imshow("Contour Display", contourImage);
+ 
 
-		contours.clear();
-
-		auto end = std::chrono::high_resolution_clock::now();
+		/*auto end = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double, std::milli> elapsed = end - start;
-		std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";
+		std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";*/
 
 		if (cv::waitKey(1) == 27) { // 当按下ESC键时退出循环
 			break;
 		}
 	}
-
-	
 }
+
+/*
+
+		CString result = g_dm->FindMultiColorEx(x1, y1, x2, y2, L"D047C7-000000", L"29312B", 0.8, 0);
+
+		long count = g_dm->GetResultCount(result);
+
+		// 假设其他代码已经正确执行，count等变量已经被赋值
+		long intX, intY;
+		for (long index = 0; index < count; ++index) {
+			// 对于每个找到的颜色，使用GetResultPos获取其坐标
+			g_dm->GetResultPos(result, index, &intX, &intY);
+
+			// 将点添加到一个新的轮廓中
+			std::vector<cv::Point> newContour;
+			newContour.push_back(cv::Point(intX, intY)); // 将点加入到轮廓中
+
+			// 将新轮廓加入到contours中
+			contours.push_back(newContour);
+		}
+*/
 
 //E525E2-060505
 //fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, &data, &size);
-
 
 		//CString result = g_dm->FindMultiColorEx(x1, y1, x2, y2, L"D047C7-000000", L"29312B", 0.8, 0);
 
