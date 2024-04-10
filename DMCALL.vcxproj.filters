@@ -32,6 +32,9 @@
     <None Include="DmReg.dll">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="opencv_world490d.dll">
+      <Filter>Header Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="obj.h">

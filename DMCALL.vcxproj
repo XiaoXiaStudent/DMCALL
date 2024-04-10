@@ -167,6 +167,7 @@
   <ItemGroup>
     <None Include="dm.dll" />
     <None Include="DmReg.dll" />
+    <None Include="opencv_world490d.dll" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />

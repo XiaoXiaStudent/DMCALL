@@ -85,7 +85,16 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	}
 
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等
+ // 屏幕区域坐标
+	int x1 = 0, y1 = 0, x2 = 500, y2 = 500;
+
+	// 创建并启动线程
+	std::thread contourThread(findAndDrawContours, x1, y1, x2, y2);
+
 	captureToBuffer();
+
+	// 等待辅助线程结束
+	contourThread.join();
 
 	CoUninitialize();
 	delete g_dm;
@@ -95,15 +104,15 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 void captureToBuffer()
 {
 	int x1 = 0, y1 = 0;
-	int x2 = 600, y2 = 600;
+	int x2 = 500, y2 = 500;
 	int width = x2 - x1 + 1;
 	int height = y2 - y1 + 1;
 	long mouseX, mouseY;
 
 	// 创建窗口以显示原始图像和轮廓图像
 	cv::namedWindow("Original Display", cv::WINDOW_AUTOSIZE);
-	cv::namedWindow("Contour Display", cv::WINDOW_AUTOSIZE);
-	cv::namedWindow("Binary Contour Display", cv::WINDOW_AUTOSIZE);
+	
+
 
  
 
@@ -129,93 +138,96 @@ void captureToBuffer()
 	{
 		auto start = std::chrono::high_resolution_clock::now();
 
-		long data;
-		long size;
-		int fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, &data, &size);
+		 //变量用于保存数据指针和大小
+		unsigned char* data = nullptr;
+		long size = 0;
 
-		// 读取指针到数组
-		genePic2.clear();
-		genePic2.resize(size);
-		for (int i = 0; i < size; i++) {
-			genePic2[i] = *reinterpret_cast<unsigned char*>(data + i);
-		}
+		// 获取屏幕数据
+		int fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, reinterpret_cast<long*>(&data), &size);
 
-		image = cv::imdecode(cv::Mat(genePic2), cv::IMREAD_COLOR);
+		// 使用获得的数据创建cv::Mat对象
+		cv::Mat rawData(1, size, CV_8UC1, data); // data 是指向位图数据的指针
+		cv::Mat image = cv::imdecode(rawData, cv::IMREAD_COLOR); // 解码位图数据
+
 
 		if (image.empty()) {
 			std::cout << "无法从内存数据加载图片" << std::endl;
 			//break; // 退出循环
 		}
 
+
 		// 在原始窗口中显示图像
 		cv::imshow("Original Display", image);
 
-		//获取当前鼠标位置
+		////获取当前鼠标位置
 		g_dm->GetCursorPos(&mouseX, &mouseY);
 
-		// 转换BGR图像到HSV颜色空间
-		cv::cvtColor(image, hsvImage, cv::COLOR_BGR2HSV);
 
-		// 使用HSV颜色范围在原始图像上创建掩码
-		cv::inRange(hsvImage, hsvLowerBound, hsvUpperBound, mask);
-
-
-		// 对掩码进行高斯模糊，减少噪声
-		cv::GaussianBlur(mask, mask, cv::Size(5, 5), 0);
-	
-		cv::Canny(mask, edges, 100, 200);
-
-	
-		// 创建一个5x5的结构元素
-		cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
-
-		// 对边缘图像进行闭运算
-		cv::morphologyEx(edges, edges, cv::MORPH_CLOSE, kernel);
-
-		// 显示二值化轮廓图像
-		cv::imshow("Binary Contour Display", edges);
-
-		// 在边缘图像上查找轮廓
-		std::vector<std::vector<cv::Point>> contours;
-		cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
-
-		// 找到面积最大的轮廓的凸包
-		double maxArea = 0;
-		std::vector<cv::Point> largestHull;
-		for (size_t i = 0; i < contours.size(); i++) {
-			// 对轮廓进行简化
-			std::vector<cv::Point> approx;
-			cv::approxPolyDP(contours[i], approx, 1.0, true);
-
-			// 计算凸包
-			std::vector<cv::Point> hull;
-			cv::convexHull(approx, hull);
-
-			// 检查是否为最大面积的凸包
-			double area = cv::contourArea(hull);
-			if (area > maxArea) {
-				maxArea = area;
-				largestHull = hull;
-			}
-		}
-
-		// 绘制最大凸包轮廓
-		cv::Mat contourImage = cv::Mat::zeros(image.size(), CV_8UC3);
-		if (!largestHull.empty()) {
-			std::vector<std::vector<cv::Point>> hullsToDraw;
-			hullsToDraw.push_back(largestHull);
-			cv::drawContours(contourImage, hullsToDraw, -1, cv::Scalar(255, 255, 255), 1);
-		}
-	 
  
+
+		//auto end = std::chrono::high_resolution_clock::now();
+		//std::chrono::duration<double, std::milli> elapsed = end - start;
+		//std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";
+
+		if (cv::waitKey(1) == 27) { // 当按下ESC键时退出循环
+			break;
+		}
+	}
+
+
+	
+}
+
+void findAndDrawContours(int x1, int y1, int x2, int y2) {
+
+	dmsoft* dm= new dmsoft;
+
+
+	// 创建窗口以显示原始图像和轮廓图像
+
+	cv::namedWindow("Contour Display", cv::WINDOW_AUTOSIZE);
+
+
+	// 在循环外部准备可能重用的资源
+ 
+
+	int width = x2 - x1 + 1;
+	int height = y2 - y1 + 1;
+	while (true)
+	{
+
+		//查找人物颜色坐标
+		std::vector<std::vector<cv::Point>> contours;
+		CString result = dm->FindMultiColorEx(x1, y1, x2, y2, L"D047C7-000000", L"29312B", 0.8, 0);
+		//假设 FindMultiColorE 已经调用，返回了坐标字符串
+
+
+		long count = dm->GetResultCount(result);
+
+		// 假设其他代码已经正确执行，count等变量已经被赋值
+		long intX, intY;
+		for (long index = 0; index < count; ++index) {
+			// 对于每个找到的颜色，使用GetResultPos获取其坐标
+			dm->GetResultPos(result, index, &intX, &intY);
+
+			// 将点添加到一个新的轮廓中
+			std::vector<cv::Point> newContour;
+			newContour.push_back(cv::Point(intX, intY)); // 将点加入到轮廓中
+
+			// 将新轮廓加入到contours中
+			contours.push_back(newContour);
+		}
+
+		cv::Mat contourImage = cv::Mat::zeros(cv::Size(width, height), CV_8UC3);
+		// 画轮廓，其中contours是包含轮廓点的数组
+		for (size_t i = 0; i < contours.size(); i++) {
+			cv::Scalar color = cv::Scalar(255, 255, 255); // 
+			cv::drawContours(contourImage, contours, static_cast<int>(i), color);
+		}
+
+
 		// 显示轮廓图像
 		cv::imshow("Contour Display", contourImage);
- 
-
-		/*auto end = std::chrono::high_resolution_clock::now();
-		std::chrono::duration<double, std::milli> elapsed = end - start;
-		std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";*/
 
 		if (cv::waitKey(1) == 27) { // 当按下ESC键时退出循环
 			break;
@@ -263,4 +275,60 @@ void captureToBuffer()
 
 		//	// 将新轮廓加入到contours中
 		//	contours.push_back(newContour);
+		//}
+
+
+//// 转换BGR图像到HSV颜色空间
+		//cv::cvtColor(image, hsvImage, cv::COLOR_BGR2HSV);
+
+		//// 使用HSV颜色范围在原始图像上创建掩码
+		//cv::inRange(hsvImage, hsvLowerBound, hsvUpperBound, mask);
+
+
+		//// 对掩码进行高斯模糊，减少噪声
+		//cv::GaussianBlur(mask, mask, cv::Size(5, 5), 0);
+
+		//cv::Canny(mask, edges, 100, 200);
+
+
+		//// 创建一个5x5的结构元素
+		//cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
+
+		//// 对边缘图像进行闭运算
+		//cv::morphologyEx(edges, edges, cv::MORPH_CLOSE, kernel);
+
+		//// 显示二值化轮廓图像
+		//cv::imshow("Binary Contour Display", edges);
+
+		//// 在边缘图像上查找轮廓
+		//std::vector<std::vector<cv::Point>> contours;
+		//cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+
+		//// 找到面积最大的轮廓的凸包
+		//double maxArea = 0;
+		//std::vector<cv::Point> largestHull;
+		//for (size_t i = 0; i < contours.size(); i++) {
+		//	// 对轮廓进行简化
+		//	std::vector<cv::Point> approx;
+		//	cv::approxPolyDP(contours[i], approx, 1.0, true);
+
+		//	// 计算凸包
+		//	std::vector<cv::Point> hull;
+		//	cv::convexHull(approx, hull);
+
+		//	// 检查是否为最大面积的凸包
+		//	double area = cv::contourArea(hull);
+		//	if (area > maxArea) {
+		//		maxArea = area;
+		//		largestHull = hull;
+		//	}
+		//}
+
+		//// 绘制最大凸包轮廓
+		//cv::Mat contourImage = cv::Mat::zeros(image.size(), CV_8UC3);
+		//if (!largestHull.empty()) {
+		//	std::vector<std::vector<cv::Point>> hullsToDraw;
+		//	hullsToDraw.push_back(largestHull);
+		//	cv::drawContours(contourImage, hullsToDraw, -1, cv::Scalar(255, 255, 255), 1);
 		//}
