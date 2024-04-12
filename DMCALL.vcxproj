@@ -167,7 +167,8 @@
   <ItemGroup>
     <None Include="dm.dll" />
     <None Include="DmReg.dll" />
-    <None Include="opencv_world490d.dll" />
+    <None Include="yolov5m.onnx" />
+    <None Include="yolov5s.onnx" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -178,6 +179,12 @@
   <ItemGroup>
     <Library Include="hid.lib" />
     <Library Include="msdkLib.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="1.jpg" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="classes.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

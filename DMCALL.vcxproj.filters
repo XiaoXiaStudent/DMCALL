@@ -32,8 +32,11 @@
     <None Include="DmReg.dll">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="opencv_world490d.dll">
-      <Filter>Header Files</Filter>
+    <None Include="yolov5m.onnx">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="yolov5s.onnx">
+      <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -57,5 +60,13 @@
     <Library Include="hid.lib">
       <Filter>Resource Files</Filter>
     </Library>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="1.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="classes.txt" />
   </ItemGroup>
 </Project>

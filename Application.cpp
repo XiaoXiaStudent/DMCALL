@@ -9,7 +9,132 @@
 
 dmsoft* g_dm = NULL;
 
-int main(int argc, TCHAR* argv[], TCHAR* envp[])
+std::vector<std::string> load_class_list()
+{
+	std::vector<std::string> class_list;
+	std::ifstream ifs("classes.txt");
+	std::string line;
+	while (getline(ifs, line))
+	{
+		class_list.push_back(line);
+	}
+	return class_list;
+}
+
+void load_net(cv::dnn::Net& net, bool is_cuda)
+{
+	auto result = cv::dnn::readNet("weights\\yolov5s.onnx");
+	if (is_cuda)
+	{
+		std::cout << "Attempty to use CUDA\n";
+		result.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+		result.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA_FP16);
+	}
+	else
+	{
+		std::cout << "Running on CPU\n";
+		result.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+		result.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+	}
+	net = result;
+}
+const std::vector<cv::Scalar> colors = { cv::Scalar(255, 255, 0), cv::Scalar(0, 255, 0), cv::Scalar(0, 255, 255), cv::Scalar(255, 0, 0) };
+
+const float INPUT_WIDTH = 640.0;
+const float INPUT_HEIGHT = 640.0;
+const float SCORE_THRESHOLD = 0.2;
+const float NMS_THRESHOLD = 0.4;
+const float CONFIDENCE_THRESHOLD = 0.2;
+ 
+
+
+
+struct Detection
+{
+	int class_id;
+	float confidence;
+	cv::Rect box;
+	std::string className;
+	
+};
+
+cv::Mat format_yolov5(const cv::Mat& source) {
+	int col = source.cols;
+	int row = source.rows;
+	int _max = MAX(col, row);
+	cv::Mat result = cv::Mat::zeros(_max, _max, CV_8UC3);
+	source.copyTo(result(cv::Rect(0, 0, col, row)));
+	return result;
+}
+
+void detect(cv::Mat& image, cv::dnn::Net& net, std::vector<Detection>& output, const std::vector<std::string>& className) {
+	cv::Mat blob;
+
+	auto input_image = format_yolov5(image);
+
+	cv::dnn::blobFromImage(input_image, blob, 1. / 255., cv::Size(INPUT_WIDTH, INPUT_HEIGHT), cv::Scalar(), true, false);
+	net.setInput(blob);
+	std::vector<cv::Mat> outputs;
+	net.forward(outputs, net.getUnconnectedOutLayersNames());
+
+	float x_factor = input_image.cols / INPUT_WIDTH;
+	float y_factor = input_image.rows / INPUT_HEIGHT;
+
+	float* data = (float*)outputs[0].data;
+
+	const int dimensions = 85;
+	const int rows = 25200;
+
+	std::vector<int> class_ids;
+	std::vector<float> confidences;
+	std::vector<cv::Rect> boxes;
+
+	for (int i = 0; i < rows; ++i) {
+
+		float confidence = data[i * dimensions + 4];
+		if (confidence >= CONFIDENCE_THRESHOLD) {
+
+			float* classes_scores = &data[i * dimensions + 5];
+			cv::Mat scores(1, className.size(), CV_32FC1, classes_scores);
+			cv::Point class_id;
+			double max_class_score;
+			minMaxLoc(scores, 0, &max_class_score, 0, &class_id);
+			if (max_class_score < SCORE_THRESHOLD) {
+
+				confidences.push_back(confidence);
+
+				class_ids.push_back(class_id.x);
+
+				float x = data[i * dimensions + 0];
+				float y = data[i * dimensions + 1];
+				float w = data[i * dimensions + 2];
+				float h = data[i * dimensions + 3];
+				int left = int((x - 0.5 * w) * x_factor);
+				int top = int((y - 0.5 * h) * y_factor);
+				int width = int(w * x_factor);
+				int height = int(h * y_factor);
+				boxes.push_back(cv::Rect(left, top, width, height));
+			}
+
+		}
+	}
+
+
+	std::vector<int> nms_result;
+	//cv::dnn::NMSBoxes(boxes, confidences, SCORE_THRESHOLD, NMS_THRESHOLD, nms_result);
+	for (int i = 0; i < nms_result.size(); i++) {
+		int idx = nms_result[i];
+		Detection result;
+		result.class_id = class_ids[idx];
+		result.confidence = confidences[idx];
+		result.box = boxes[idx];
+		output.push_back(result);
+	}
+}
+
+
+
+int main(int argc, char** argv, TCHAR* envp[])
 {
 #ifdef _DEBUG
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -85,16 +210,49 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	}
 
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等
- // 屏幕区域坐标
-	int x1 = 0, y1 = 0, x2 = 500, y2 = 500;
 
 	// 创建并启动线程
-	std::thread contourThread(findAndDrawContours, x1, y1, x2, y2);
+	//std::thread contourThread(findAndDrawContours, x1, y1, x2, y2);
 
-	captureToBuffer();
+	//captureToBuffer();
 
 	// 等待辅助线程结束
-	contourThread.join();
+	//contourThread.join();
+
+	std::vector<std::string> class_list = load_class_list();
+
+	cv::Mat frame = cv::imread("1.jpg");
+
+	bool is_cuda = argc > 1 && strcmp(argv[1], "cuda") == 0;
+
+	cv::dnn::Net net;
+	load_net(net, is_cuda);
+
+	auto start = std::chrono::high_resolution_clock::now();
+	int frame_count = 0;
+	float fps = -1;
+	int total_frames = 0;
+
+	std::vector<Detection> output;
+	detect(frame, net, output, class_list);
+
+	int detections = output.size();
+
+	for (int i = 0; i < detections; ++i)
+	{
+		auto detection = output[i];
+		auto box = detection.box;
+		auto classId = detection.class_id;
+		const auto color = colors[classId % colors.size()];
+		cv::rectangle(frame, box, color, 3);
+
+		cv::rectangle(frame, cv::Point(box.x, box.y - 20), cv::Point(box.x + box.width, box.y), color, cv::FILLED);
+		cv::putText(frame, class_list[classId].c_str(), cv::Point(box.x, box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
+	}
+
+	cv::imshow("output", frame);
+	cv::waitKey(0);
+	cv::destroyAllWindows();
 
 	CoUninitialize();
 	delete g_dm;
@@ -111,15 +269,11 @@ void captureToBuffer()
 
 	// 创建窗口以显示原始图像和轮廓图像
 	cv::namedWindow("Original Display", cv::WINDOW_AUTOSIZE);
-	
-
-
- 
+	cv::namedWindow("Contours Display", cv::WINDOW_AUTOSIZE);
 
 	// 在循环外部准备可能重用的资源
-	cv::Mat hsvImage, mask, edges;
-	std::vector<unsigned char> genePic2;
 	cv::Mat image;
+	cv::Mat grayImage;
 
 	int B = 199, G = 71, R = 208;
 	int deltaB = 35, deltaG = 35, deltaR = 35;
@@ -128,8 +282,8 @@ void captureToBuffer()
 	cv::Scalar bgrLowerBound(B - deltaB, G - deltaG, R - deltaR);
 	cv::Scalar bgrUpperBound(B + deltaB, G + deltaG, R + deltaR);
 
-		// 定义RGB颜色空间中的颜色范围（洋红色）
-  // 洋红色的HSV颜色空间范围
+	// 定义RGB颜色空间中的颜色范围（洋红色）
+// 洋红色的HSV颜色空间范围
 	cv::Scalar hsvLowerBound(139, 96, 129);
 	cv::Scalar hsvUpperBound(169, 225, 225);
 
@@ -138,7 +292,7 @@ void captureToBuffer()
 	{
 		auto start = std::chrono::high_resolution_clock::now();
 
-		 //变量用于保存数据指针和大小
+		//变量用于保存数据指针和大小
 		unsigned char* data = nullptr;
 		long size = 0;
 
@@ -149,58 +303,63 @@ void captureToBuffer()
 		cv::Mat rawData(1, size, CV_8UC1, data); // data 是指向位图数据的指针
 		cv::Mat image = cv::imdecode(rawData, cv::IMREAD_COLOR); // 解码位图数据
 
-
-		if (image.empty()) {
-			std::cout << "无法从内存数据加载图片" << std::endl;
-			//break; // 退出循环
-		}
-
-
 		// 在原始窗口中显示图像
 		cv::imshow("Original Display", image);
 
-		////获取当前鼠标位置
-		g_dm->GetCursorPos(&mouseX, &mouseY);
+		// 1. 转换为灰度图像
+		cv::Mat grayImage;
+		cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
 
+		// 2. 应用高斯模糊降噪
+		cv::Mat blurredImage;
+		cv::GaussianBlur(grayImage, blurredImage, cv::Size(5, 5), 1.5);
 
- 
+		// 3. 进行Canny边缘检测
+		cv::Mat edges;
+		cv::Canny(blurredImage, edges, 50, 150); // 这里的阈值可以根据实际需要调整
 
-		//auto end = std::chrono::high_resolution_clock::now();
-		//std::chrono::duration<double, std::milli> elapsed = end - start;
-		//std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";
+		// 4. 寻找轮廓
+		std::vector<std::vector<cv::Point>> contours;
+		cv::findContours(edges, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+
+		// 5. 绘制轮廓
+		cv::Mat contourImage = cv::Mat::zeros(image.size(), CV_8UC3);
+		for (int i = 0; i < contours.size(); i++) {
+			cv::Scalar color = cv::Scalar(255, 255, 255); // 白色轮廓
+			cv::drawContours(contourImage, contours, i, color, 1, cv::LINE_8);
+		}
+
+		cv::imshow("Contours Display", contourImage);
+
+		auto end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double, std::milli> elapsed = end - start;
+		std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";
 
 		if (cv::waitKey(1) == 27) { // 当按下ESC键时退出循环
 			break;
 		}
 	}
-
-
-	
 }
 
 void findAndDrawContours(int x1, int y1, int x2, int y2) {
-
-	dmsoft* dm= new dmsoft;
-
+	dmsoft* dm = new dmsoft;
 
 	// 创建窗口以显示原始图像和轮廓图像
 
 	cv::namedWindow("Contour Display", cv::WINDOW_AUTOSIZE);
 
-
 	// 在循环外部准备可能重用的资源
- 
 
 	int width = x2 - x1 + 1;
 	int height = y2 - y1 + 1;
 	while (true)
 	{
+		auto start = std::chrono::high_resolution_clock::now();
 
 		//查找人物颜色坐标
 		std::vector<std::vector<cv::Point>> contours;
 		CString result = dm->FindMultiColorEx(x1, y1, x2, y2, L"D047C7-000000", L"29312B", 0.8, 0);
 		//假设 FindMultiColorE 已经调用，返回了坐标字符串
-
 
 		long count = dm->GetResultCount(result);
 
@@ -221,10 +380,13 @@ void findAndDrawContours(int x1, int y1, int x2, int y2) {
 		cv::Mat contourImage = cv::Mat::zeros(cv::Size(width, height), CV_8UC3);
 		// 画轮廓，其中contours是包含轮廓点的数组
 		for (size_t i = 0; i < contours.size(); i++) {
-			cv::Scalar color = cv::Scalar(255, 255, 255); // 
+			cv::Scalar color = cv::Scalar(255, 255, 255); //
 			cv::drawContours(contourImage, contours, static_cast<int>(i), color);
 		}
 
+		auto end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double, std::milli> elapsed = end - start;
+		std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";
 
 		// 显示轮廓图像
 		cv::imshow("Contour Display", contourImage);
@@ -277,19 +439,16 @@ void findAndDrawContours(int x1, int y1, int x2, int y2) {
 		//	contours.push_back(newContour);
 		//}
 
-
 //// 转换BGR图像到HSV颜色空间
 		//cv::cvtColor(image, hsvImage, cv::COLOR_BGR2HSV);
 
 		//// 使用HSV颜色范围在原始图像上创建掩码
 		//cv::inRange(hsvImage, hsvLowerBound, hsvUpperBound, mask);
 
-
 		//// 对掩码进行高斯模糊，减少噪声
 		//cv::GaussianBlur(mask, mask, cv::Size(5, 5), 0);
 
 		//cv::Canny(mask, edges, 100, 200);
-
 
 		//// 创建一个5x5的结构元素
 		//cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
@@ -303,7 +462,6 @@ void findAndDrawContours(int x1, int y1, int x2, int y2) {
 		//// 在边缘图像上查找轮廓
 		//std::vector<std::vector<cv::Point>> contours;
 		//cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
 
 		//// 找到面积最大的轮廓的凸包
 		//double maxArea = 0;
