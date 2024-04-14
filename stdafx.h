@@ -54,8 +54,16 @@
 #include "array"
 #include <vector>
 #include <iostream>
+
+#include<math.h>
+#include <fstream>
 #include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp> // 包含 OpenCV 核心功能
+#include <opencv2/core/utility.hpp> // 包含日志管理功能
+
+#include<opencv2/opencv.hpp>
 #include <chrono>
-#include <opencv2/core/utils/logger.hpp>
+#include "yolo.h"
 #define _CRTDBG_MAP_ALLOC
 #include <crtdbg.h>
+#include <mutex>

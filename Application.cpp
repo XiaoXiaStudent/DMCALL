@@ -23,30 +23,17 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	// 设置本地字符集为gbk
 	setlocale(LC_ALL, "chs");
 
-	// 注意：这里使用了 const wchar_t* 并且指定了 __stdcall 调用约定
+	/* // 注意：这里使用了 const wchar_t* 并且指定了 __stdcall 调用约定
 	typedef void(__stdcall* SetDllPathWType)(const wchar_t*, int);
 
-	// 使用MFC的AfxLoadLibrary加载DLL
+	 使用MFC的AfxLoadLibrary加载DLL
 	HMODULE hModule = LoadLibrary(TEXT("DmReg.dll"));
 	if (hModule == NULL) {
 		std::cerr << "加载DLL失败!" << std::endl;
 		return 1;
 	}
 
-	//飞易来调用鼠标移动逻辑
-	/*HANDLE openFYL = M_Open(1);
-
-	M_MoveTo2(openFYL, 200, 300);
-
-	M_Close(openFYL);*/
-
-	/*HANDLE openFYL = Ap5isNXMcaWr(1);
-
-	n8MDw8SN3t(openFYL, 200, 300);
-
-	Dfd8mbZxDc0f(openFYL);*/
-
-	// 获取函数地址
+	 获取函数地址
 	SetDllPathWType SetDllPathW = (SetDllPathWType)GetProcAddress(hModule, "SetDllPathW");
 	if (!SetDllPathW) {
 		std::cerr << "获取函数地址失败!" << std::endl;
@@ -54,10 +41,26 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 		return 1;
 	}
 
-	// 调用函数
-	SetDllPathW(_T("dm.dll"), 0);
+		//// 调用函数
+	//SetDllPathW(_T("dm.dll"), 0);
 
-	FreeLibrary(hModule);
+	//FreeLibrary(hModule);
+	*/
+
+	//飞易来调用鼠标移动逻辑
+	/*HANDLE openFYL = M_Open(1);
+
+	M_MoveTo2(openFYL, 200, 300);
+
+	M_Close(openFYL)
+
+		HANDLE openFYL = Ap5isNXMcaWr(1);
+
+	n8MDw8SN3t(openFYL, 200, 300);
+
+	Dfd8mbZxDc0f(openFYL);
+
+	;*/
 
 	// 创建对象
 	g_dm = new dmsoft();
@@ -74,7 +77,7 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 	{
 		std::cout << "注册失败:" << dm_ret << std::endl;
 		std::wcout << L"版本:" << version.GetString() << std::endl;
-		FreeLibrary(hModule);
+		//FreeLibrary(hModule);
 		delete g_dm;
 		return 1;
 	}
@@ -86,121 +89,174 @@ int main(int argc, TCHAR* argv[], TCHAR* envp[])
 
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等
  // 屏幕区域坐标
-	int x1 = 0, y1 = 0, x2 = 500, y2 = 500;
 
-	// 创建并启动线程
-	std::thread contourThread(findAndDrawContours, x1, y1, x2, y2);
 
-	captureToBuffer();
+	
 
-	// 等待辅助线程结束
-	contourThread.join();
+	std::mutex mtx; // 全局互斥锁
+	// 在循环外部准备可能重用的资源
+	cv::Mat image;
 
+
+	std::thread captureThread([&image,&mtx]() {
+			captureToBuffer(image, mtx);
+		});
+
+	std::thread detectionThread([&image,&mtx]() {
+
+		//生成随机颜色
+		std::vector<cv::Scalar> color;
+		srand(time(0));
+
+
+		std::vector<Output> result;
+
+		std::string model_path = "yolov5s.onnx";
+
+		Yolov5 test;
+
+		cv::dnn::Net net;
+		if (test.readModel(net, model_path, true)) {
+			std::cout << "read net ok!" << std::endl;
+		}
+		else {
+			std::cout << "read net failed!" << std::endl;
+		}
+
+		for (int i = 0; i < 80; i++) {
+			int b = rand() % 256;
+			int g = rand() % 256;
+			int r = rand() % 256;
+			color.push_back(cv::Scalar(b, g, r));
+		}
+
+		while (true) {
+			mtx.lock(); // 获取锁
+			if (image.empty()) {
+				
+				std::cout << "无法从内存数据加载图片" << std::endl;
+				mtx.unlock();
+				break; // 退出循环
+			
+			}
+			auto start = std::chrono::high_resolution_clock::now();
+			std::vector<Output> result;
+			if (test.Detect(image, net, result)) {
+				test.drawPred(image, result, color);
+			}
+			else {
+				std::cout << "Detect Failed!" << std::endl;
+				mtx.unlock(); // 释放锁
+			}
+
+			auto end = std::chrono::high_resolution_clock::now();
+			std::chrono::duration<double, std::milli> elapsed = end - start;
+			std::cout << "识别: " << elapsed.count() << " ms\n";
+
+			if (!result.empty()) {
+				mtx.unlock(); // 释放锁
+			}
+			
+		}
+		});
+
+
+
+	// 等待线程结束
+	captureThread.join();
+	detectionThread.join();
 	CoUninitialize();
 	delete g_dm;
 	return 0;
 }
 
-void captureToBuffer()
+void captureToBuffer(cv::Mat& image, std::mutex&  mtx)
 {
-	int x1 = 0, y1 = 0;
-	int x2 = 500, y2 = 500;
+	int x1 = 250, y1 = 250;
+	int x2 = 750, y2 = 750;
 	int width = x2 - x1 + 1;
 	int height = y2 - y1 + 1;
+
 	long mouseX, mouseY;
 
 	// 创建窗口以显示原始图像和轮廓图像
 	cv::namedWindow("Original Display", cv::WINDOW_AUTOSIZE);
-	
-
-
- 
-
-	// 在循环外部准备可能重用的资源
-	cv::Mat hsvImage, mask, edges;
-	std::vector<unsigned char> genePic2;
-	cv::Mat image;
-
-	int B = 199, G = 71, R = 208;
-	int deltaB = 35, deltaG = 35, deltaR = 35;
-
-	// 定义BGR空间中的颜色范围
-	cv::Scalar bgrLowerBound(B - deltaB, G - deltaG, R - deltaR);
-	cv::Scalar bgrUpperBound(B + deltaB, G + deltaG, R + deltaR);
-
-		// 定义RGB颜色空间中的颜色范围（洋红色）
-  // 洋红色的HSV颜色空间范围
-	cv::Scalar hsvLowerBound(139, 96, 129);
-	cv::Scalar hsvUpperBound(169, 225, 225);
 
 	while (true)
 
 	{
 		auto start = std::chrono::high_resolution_clock::now();
 
-		 //变量用于保存数据指针和大小
+		//变量用于保存数据指针和大小
 		unsigned char* data = nullptr;
 		long size = 0;
 
 		// 获取屏幕数据
 		int fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, reinterpret_cast<long*>(&data), &size);
-
+	 
 		// 使用获得的数据创建cv::Mat对象
 		cv::Mat rawData(1, size, CV_8UC1, data); // data 是指向位图数据的指针
-		cv::Mat image = cv::imdecode(rawData, cv::IMREAD_COLOR); // 解码位图数据
 
-
+		image = cv::imdecode(rawData, cv::IMREAD_COLOR); // 解码位图数据
+		
+		 
 		if (image.empty()) {
 			std::cout << "无法从内存数据加载图片" << std::endl;
-			//break; // 退出循环
+			break; // 退出循环
 		}
-
-
 		// 在原始窗口中显示图像
 		cv::imshow("Original Display", image);
 
-		////获取当前鼠标位置
-		g_dm->GetCursorPos(&mouseX, &mouseY);
 
+		auto end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double, std::milli> elapsed = end - start;
+		//std::cout << "捕获: " << elapsed.count() << " ms\n";
 
- 
-
-		//auto end = std::chrono::high_resolution_clock::now();
-		//std::chrono::duration<double, std::milli> elapsed = end - start;
-		//std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";
 
 		if (cv::waitKey(1) == 27) { // 当按下ESC键时退出循环
 			break;
 		}
-	}
-
-
 	
+	}
 }
 
-void findAndDrawContours(int x1, int y1, int x2, int y2) {
-
+/*
+void findAndDrawContours() {
 	dmsoft* dm= new dmsoft;
-
 
 	// 创建窗口以显示原始图像和轮廓图像
 
 	cv::namedWindow("Contour Display", cv::WINDOW_AUTOSIZE);
 
-
-	// 在循环外部准备可能重用的资源
- 
+	int x1 = 400 ,y1 = 0, x2 = 1200, y2 = 800;
 
 	int width = x2 - x1 + 1;
 	int height = y2 - y1 + 1;
+
+	long dm_ret = dm->BindWindowEx(197080, L"normal", L"normal", L"normal", L"", 0);
+
+	// Check if the binding was successful
+	if (dm_ret != 1) {
+		std::cerr << "Failed to bind the window!" << std::endl;
+	}
+	else
+	{
+		std::cout << "绑定成功" << std::endl;
+	}
+	long width1, height1;
+
+	dm->GetClientSize(197080, &width1, &height1);
+
+	std::cout << "width1:" << width1 << "height1:" << height1 << std::endl;
+
 	while (true)
 	{
+		auto start = std::chrono::high_resolution_clock::now();
 
 		//查找人物颜色坐标
 		std::vector<std::vector<cv::Point>> contours;
 		CString result = dm->FindMultiColorEx(x1, y1, x2, y2, L"D047C7-000000", L"29312B", 0.8, 0);
 		//假设 FindMultiColorE 已经调用，返回了坐标字符串
-
 
 		long count = dm->GetResultCount(result);
 
@@ -218,22 +274,27 @@ void findAndDrawContours(int x1, int y1, int x2, int y2) {
 			contours.push_back(newContour);
 		}
 
-		cv::Mat contourImage = cv::Mat::zeros(cv::Size(width, height), CV_8UC3);
+		cv::Mat contourImage(height, width, CV_8UC3, cv::Scalar(0, 0, 0));
 		// 画轮廓，其中contours是包含轮廓点的数组
 		for (size_t i = 0; i < contours.size(); i++) {
-			cv::Scalar color = cv::Scalar(255, 255, 255); // 
+			cv::Scalar color = cv::Scalar(255, 255, 255); //
 			cv::drawContours(contourImage, contours, static_cast<int>(i), color);
 		}
-
 
 		// 显示轮廓图像
 		cv::imshow("Contour Display", contourImage);
 
-		if (cv::waitKey(1) == 27) { // 当按下ESC键时退出循环
-			break;
-		}
+	/*	auto end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double, std::milli> elapsed = end - start;
+		std::cout << "test02执行时间1111: " << elapsed.count() << " ms\n";
+
+if (cv::waitKey(1) == 27) { // 当按下ESC键时退出循环
+	break;
+}
 	}
 }
+
+*/
 
 /*
 
@@ -277,19 +338,16 @@ void findAndDrawContours(int x1, int y1, int x2, int y2) {
 		//	contours.push_back(newContour);
 		//}
 
-
 //// 转换BGR图像到HSV颜色空间
 		//cv::cvtColor(image, hsvImage, cv::COLOR_BGR2HSV);
 
 		//// 使用HSV颜色范围在原始图像上创建掩码
 		//cv::inRange(hsvImage, hsvLowerBound, hsvUpperBound, mask);
 
-
 		//// 对掩码进行高斯模糊，减少噪声
 		//cv::GaussianBlur(mask, mask, cv::Size(5, 5), 0);
 
 		//cv::Canny(mask, edges, 100, 200);
-
 
 		//// 创建一个5x5的结构元素
 		//cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
@@ -303,7 +361,6 @@ void findAndDrawContours(int x1, int y1, int x2, int y2) {
 		//// 在边缘图像上查找轮廓
 		//std::vector<std::vector<cv::Point>> contours;
 		//cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
 
 		//// 找到面积最大的轮廓的凸包
 		//double maxArea = 0;
