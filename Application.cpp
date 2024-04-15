@@ -7,7 +7,21 @@
 #include "msdk.h"
 #include "Application.h"
 
+cv::Mat detectedImage;    // 存储识别后的图像
+bool detectionReady = false;  // 识别结果是否准备好的标志
+bool running = true;  // 识别结果是否准备好的标志
+cv::Mat image;  // 共享图像资源
 dmsoft* g_dm = NULL;
+Yolov5 test;
+
+std::mutex mtx; // 全局互斥量
+
+
+std::vector<cv::Scalar> color;  // 随机颜色数组
+std::vector<Output> result;
+cv::dnn::Net net;
+std::string model_path = "yolov5s.onnx";
+
 
 std::vector<std::string> load_class_list()
 {
@@ -45,9 +59,6 @@ const float INPUT_HEIGHT = 640.0;
 const float SCORE_THRESHOLD = 0.2;
 const float NMS_THRESHOLD = 0.4;
 const float CONFIDENCE_THRESHOLD = 0.2;
- 
-
-
 
 struct Detection
 {
@@ -55,7 +66,6 @@ struct Detection
 	float confidence;
 	cv::Rect box;
 	std::string className;
-	
 };
 
 cv::Mat format_yolov5(const cv::Mat& source) {
@@ -90,17 +100,14 @@ void detect(cv::Mat& image, cv::dnn::Net& net, std::vector<Detection>& output, c
 	std::vector<cv::Rect> boxes;
 
 	for (int i = 0; i < rows; ++i) {
-
 		float confidence = data[i * dimensions + 4];
 		if (confidence >= CONFIDENCE_THRESHOLD) {
-
 			float* classes_scores = &data[i * dimensions + 5];
 			cv::Mat scores(1, className.size(), CV_32FC1, classes_scores);
 			cv::Point class_id;
 			double max_class_score;
 			minMaxLoc(scores, 0, &max_class_score, 0, &class_id);
 			if (max_class_score < SCORE_THRESHOLD) {
-
 				confidences.push_back(confidence);
 
 				class_ids.push_back(class_id.x);
@@ -115,13 +122,11 @@ void detect(cv::Mat& image, cv::dnn::Net& net, std::vector<Detection>& output, c
 				int height = int(h * y_factor);
 				boxes.push_back(cv::Rect(left, top, width, height));
 			}
-
 		}
 	}
 
-
 	std::vector<int> nms_result;
-	//cv::dnn::NMSBoxes(boxes, confidences, SCORE_THRESHOLD, NMS_THRESHOLD, nms_result);
+	cv::dnn::NMSBoxes(boxes, confidences, SCORE_THRESHOLD, NMS_THRESHOLD, nms_result);
 	for (int i = 0; i < nms_result.size(); i++) {
 		int idx = nms_result[i];
 		Detection result;
@@ -131,8 +136,6 @@ void detect(cv::Mat& image, cv::dnn::Net& net, std::vector<Detection>& output, c
 		output.push_back(result);
 	}
 }
-
-
 
 int main(int argc, char** argv, TCHAR* envp[])
 {
@@ -148,17 +151,17 @@ int main(int argc, char** argv, TCHAR* envp[])
 	// 设置本地字符集为gbk
 	setlocale(LC_ALL, "chs");
 
-	/* // 注意：这里使用了 const wchar_t* 并且指定了 __stdcall 调用约定
+	// 注意：这里使用了 const wchar_t* 并且指定了 __stdcall 调用约定
 	typedef void(__stdcall* SetDllPathWType)(const wchar_t*, int);
 
-	 使用MFC的AfxLoadLibrary加载DLL
+	//使用MFC的AfxLoadLibrary加载DLL
 	HMODULE hModule = LoadLibrary(TEXT("DmReg.dll"));
 	if (hModule == NULL) {
 		std::cerr << "加载DLL失败!" << std::endl;
 		return 1;
 	}
 
-	 获取函数地址
+	// 获取函数地址
 	SetDllPathWType SetDllPathW = (SetDllPathWType)GetProcAddress(hModule, "SetDllPathW");
 	if (!SetDllPathW) {
 		std::cerr << "获取函数地址失败!" << std::endl;
@@ -166,11 +169,10 @@ int main(int argc, char** argv, TCHAR* envp[])
 		return 1;
 	}
 
-		//// 调用函数
-	//SetDllPathW(_T("dm.dll"), 0);
+	//// 调用函数
+	SetDllPathW(_T("dm.dll"), 0);
 
-	//FreeLibrary(hModule);
-	*/
+	FreeLibrary(hModule);
 
 	//飞易来调用鼠标移动逻辑
 	/*HANDLE openFYL = M_Open(1);
@@ -202,7 +204,7 @@ int main(int argc, char** argv, TCHAR* envp[])
 	{
 		std::cout << "注册失败:" << dm_ret << std::endl;
 		std::wcout << L"版本:" << version.GetString() << std::endl;
-		//FreeLibrary(hModule);
+		FreeLibrary(hModule);
 		delete g_dm;
 		return 1;
 	}
@@ -213,89 +215,62 @@ int main(int argc, char** argv, TCHAR* envp[])
 	}
 
 	// 接下来可以做一些全局性的设置,比如加载保护盾，设置共享字库等
- // 屏幕区域坐标
+ 
 
 
-	
-
-	std::mutex mtx; // 全局互斥锁
-	// 在循环外部准备可能重用的资源
-	cv::Mat image;
-
-
-	std::thread captureThread([&image,&mtx]() {
-			captureToBuffer(image, mtx);
-		});
-
-	std::thread detectionThread([&image,&mtx]() {
-
-		//生成随机颜色
-		std::vector<cv::Scalar> color;
-		srand(time(0));
-
-
-		std::vector<Output> result;
-
-		std::string model_path = "yolov5s.onnx";
-
-		Yolov5 test;
-
-		cv::dnn::Net net;
-		if (test.readModel(net, model_path, true)) {
-			std::cout << "read net ok!" << std::endl;
-		}
-		else {
-			std::cout << "read net failed!" << std::endl;
-		}
-
-		for (int i = 0; i < 80; i++) {
-			int b = rand() % 256;
-			int g = rand() % 256;
-			int r = rand() % 256;
-			color.push_back(cv::Scalar(b, g, r));
-		}
-
-		while (true) {
-			mtx.lock(); // 获取锁
-			if (image.empty()) {
-				
-				std::cout << "无法从内存数据加载图片" << std::endl;
-				mtx.unlock();
-				break; // 退出循环
-			
-			}
-			auto start = std::chrono::high_resolution_clock::now();
-			std::vector<Output> result;
-			if (test.Detect(image, net, result)) {
-				test.drawPred(image, result, color);
-			}
-			else {
-				std::cout << "Detect Failed!" << std::endl;
-				mtx.unlock(); // 释放锁
-			}
-
-			auto end = std::chrono::high_resolution_clock::now();
-			std::chrono::duration<double, std::milli> elapsed = end - start;
-			std::cout << "识别: " << elapsed.count() << " ms\n";
-
-			if (!result.empty()) {
-				mtx.unlock(); // 释放锁
-			}
-			
-		}
-		});
+	srand(time(0));
+	for (int i = 0; i < 80; i++) {
+		color.push_back(cv::Scalar(rand() % 256, rand() % 256, rand() % 256));
+	}
 
 
 
-	// 等待线程结束
+	if (test.readModel(net, model_path, true)) {
+		std::cout << "read net ok!" << std::endl;
+	}
+	else {
+		std::cout << "read net failed!" << std::endl;
+	}
+
+	std::thread captureThread(captureToBuffer, std::ref(image));
+	std::thread displayThread(displayFistWindow, std::ref(image));
 	captureThread.join();
-	detectionThread.join();
+	displayThread.join();
+
 	CoUninitialize();
 	delete g_dm;
 	return 0;
 }
+void detectionFunction(cv::Mat& image, cv::dnn::Net& net, std::vector<cv::Scalar>& color) {
 
-void captureToBuffer(cv::Mat& image, std::mutex&  mtx)
+	result.clear();
+	if (test.Detect(image, net, result)) {
+		test.drawPred(image, result, color);
+	}
+	else {
+		std::cout << "Detection failed!" << std::endl;
+	}
+}
+#
+void displayFistWindow(cv::Mat& image) {
+	while (running) {
+		if (!image.empty()) {
+			{
+				std::lock_guard<std::mutex> lock(mtx);
+				detectionFunction(image, net, color);
+				cv::imshow("Display", image);
+			 
+			}
+		}
+
+		if (cv::waitKey(1) == 27) { // 检测 ESC 键
+			running = false;
+			break;  // 直接退出循环
+		}
+	}
+}
+
+void captureToBuffer(cv::Mat& image)
 {
 	int x1 = 250, y1 = 250;
 	int x2 = 750, y2 = 750;
@@ -304,30 +279,7 @@ void captureToBuffer(cv::Mat& image, std::mutex&  mtx)
 
 	long mouseX, mouseY;
 
-	// 创建窗口以显示原始图像和轮廓图像
-	cv::namedWindow("Original Display", cv::WINDOW_AUTOSIZE);
-
-  // 洋红色的HSV颜色空间范围
-	cv::Scalar hsvLowerBound(139, 96, 129);
-	cv::Scalar hsvUpperBound(169, 225, 225);
-
-  // 洋红色的HSV颜色空间范围
-	cv::Scalar hsvLowerBound(139, 96, 129);
-	cv::Scalar hsvUpperBound(169, 225, 225);
-
-  // 洋红色的HSV颜色空间范围
-	cv::Scalar hsvLowerBound(139, 96, 129);
-	cv::Scalar hsvUpperBound(169, 225, 225);
-
-  // 洋红色的HSV颜色空间范围
-	cv::Scalar hsvLowerBound(139, 96, 129);
-	cv::Scalar hsvUpperBound(169, 225, 225);
-
-  // 洋红色的HSV颜色空间范围
-	cv::Scalar hsvLowerBound(139, 96, 129);
-	cv::Scalar hsvUpperBound(169, 225, 225);
-
-	while (true)
+	while (running)
 
 	{
 		auto start = std::chrono::high_resolution_clock::now();
@@ -338,30 +290,18 @@ void captureToBuffer(cv::Mat& image, std::mutex&  mtx)
 
 		// 获取屏幕数据
 		int fanHui = g_dm->GetScreenDataBmp(x1, y1, x2, y2, reinterpret_cast<long*>(&data), &size);
-	 
+
 		// 使用获得的数据创建cv::Mat对象
 		cv::Mat rawData(1, size, CV_8UC1, data); // data 是指向位图数据的指针
 
-		image = cv::imdecode(rawData, cv::IMREAD_COLOR); // 解码位图数据
-		
-		 
-		if (image.empty()) {
-			std::cout << "无法从内存数据加载图片" << std::endl;
-			break; // 退出循环
+		{
+			std::lock_guard<std::mutex> lock(mtx);
+			image = cv::imdecode(rawData, cv::IMREAD_COLOR); // 解码位图数据
 		}
-		// 在原始窗口中显示图像
-		cv::imshow("Original Display", image);
-
 
 		auto end = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double, std::milli> elapsed = end - start;
-		//std::cout << "捕获: " << elapsed.count() << " ms\n";
-
-
-		if (cv::waitKey(1) == 27) { // 当按下ESC键时退出循环
-			break;
-		}
-	
+		std::cout << "捕获: " << elapsed.count() << " ms\n";
 	}
 }
 

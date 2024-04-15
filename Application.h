@@ -1,4 +1,7 @@
 #pragma once
-void captureToBuffer(cv::Mat& image, std::mutex & mtx);
+void detectionFunction(cv::Mat& imag);
+
+void displayFistWindow(cv::Mat& image);
+void captureToBuffer(cv::Mat& image);
 //
 //void findAndDrawContours();

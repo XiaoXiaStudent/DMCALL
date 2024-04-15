@@ -129,7 +129,6 @@ bool Yolov5::Detect(cv::Mat& SrcImg, cv::dnn::Net& net, std::vector<Output>& out
 		pdata += net_width; // 移动到下一行
 	}
 
-
 	//执行非最大抑制以消除具有较低置信度的冗余重叠框（NMS）
 	std::vector<int> nms_result;
 	cv::dnn::NMSBoxes(boxes, confidences, _classThreshold, _nmsThreshold, nms_result);
@@ -148,10 +147,6 @@ bool Yolov5::Detect(cv::Mat& SrcImg, cv::dnn::Net& net, std::vector<Output>& out
 }
 
 void Yolov5::drawPred(cv::Mat& img, std::vector<Output> result, std::vector<cv::Scalar> color) {
-
- 
-
-	cv::namedWindow("result", cv::WINDOW_AUTOSIZE);
 	for (int i = 0; i < result.size(); i++) {
 		int left, top;
 		left = result[i].box.x;
@@ -167,8 +162,5 @@ void Yolov5::drawPred(cv::Mat& img, std::vector<Output> result, std::vector<cv::
 		//rectangle(img, cv::Point(left, top - int(1.5 * labelSize.height)), cv::Point(left + int(1.5 * labelSize.width), top + baseLine), cv::Scalar(0, 255, 0), cv::FILLED);
 		cv::putText(img, label, cv::Point(left, top), cv::FONT_HERSHEY_SIMPLEX, 1, color[result[i].id], 2);
 	}
-	cv::imshow("result", img);
-	cv::waitKey(0);
-	img.release();
  
 }
